@@ -76,6 +76,8 @@ export class JoystickLoop {
     _computeIncrementalDistance = ({ axis, feedrate: givenFeedrate }) => {
         const { settings } = controller.settings;
 
+        const { joystickOptions: { movementDistanceOverride = 100 } } = this.gamepadProfile;
+
         const axisMaxFeedrate = Number(
             {
                 x: settings.$110,
@@ -89,9 +91,9 @@ export class JoystickLoop {
 
         const feedrateInMMPerSec = Math.round(feedrate / 60);
 
-        const executionTimeOfSingleCommand = 0.06;
+        const COMMAND_EXECUTION_TIME_IN_SECONDS = 0.06;
 
-        const incrementalDistance = feedrateInMMPerSec * executionTimeOfSingleCommand;
+        const incrementalDistance = (feedrateInMMPerSec * COMMAND_EXECUTION_TIME_IN_SECONDS) * (movementDistanceOverride / 100);
 
         return +(incrementalDistance.toFixed(2));
     };
@@ -210,6 +212,7 @@ export class JoystickLoop {
 
         const axesValues = currentGamepad?.axes;
 
+        const movementDistanceOverride = this.gamepadProfile.joystickOptions.movementDistanceOverride;
         const lockoutButton = this.gamepadProfile.lockout.button;
         const isHoldingLockoutButton = currentGamepad.buttons?.[lockoutButton]?.pressed;
 
@@ -241,6 +244,14 @@ export class JoystickLoop {
             return acc;
         }, {});
 
+        const updatedAxesWithOverride = Object.entries(updatedAxes).reduce((acc, curr) => {
+            const [axis, value] = curr;
+
+            acc[axis] = +((value * (movementDistanceOverride / 100)).toFixed(3));
+
+            return acc;
+        }, {});
+
         const largestAxisMovement = Object.entries(updatedAxes).reduce((acc, [key, value]) => {
             const val = Math.abs(value);
             if (acc === null || val > acc?.value) {
@@ -263,7 +274,7 @@ export class JoystickLoop {
             return;
         }
 
-        this.jog({ ...updatedAxes, F: feedrate });
+        this.jog({ ...updatedAxesWithOverride, F: feedrate });
 
         this.jogMovementStartTime = new Date();
 
